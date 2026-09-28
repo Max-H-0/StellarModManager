@@ -38,5 +38,13 @@
   "Download": "Herunterladen",
   "DetectedGameInstalls": "Gefundene Installationen",
   "ChooseGameFolderManually": "Manuell auswählen",
-  "SelectFolder": "Wählen"
+  "SelectFolder": "Wählen",
+  "Changelog": "Changelog",
+  "SortMostDownloaded": "Meistgeladen",
+  "SortRecentlyUpdated": "Zuletzt aktualisiert",
+  "SortName": "Name",
+  "StatsFormat": "{0:N0} Downloads · Aktualisiert {1}",
+  "AgoToday": "heute",
+  "AgoYesterday": "gestern",
+  "AgoDays": "vor {0} Tagen"
 }

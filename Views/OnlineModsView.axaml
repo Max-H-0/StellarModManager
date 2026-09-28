@@ -17,9 +17,9 @@
                 Classes="secondary"
                 Margin="0,0,8,0"
                 SelectedIndex="{Binding SortIndex}">
-                <ComboBoxItem Content="Most downloaded" />
-                <ComboBoxItem Content="Recently updated" />
-                <ComboBoxItem Content="Name" />
+                <ComboBoxItem Content="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SortMostDownloaded]}" />
+                <ComboBoxItem Content="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SortRecentlyUpdated]}" />
+                <ComboBoxItem Content="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SortName]}" />
             </ComboBox>
             <Button
                 Grid.Column="2"

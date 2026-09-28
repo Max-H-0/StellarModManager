@@ -16,6 +16,7 @@ public partial class OnlineModInfo : ModInfo
         LocalizationService.Instance.LanguageChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(InstallButtonText));
+            OnPropertyChanged(nameof(StatsText));
         };
     }
 
@@ -62,17 +63,20 @@ public partial class OnlineModInfo : ModInfo
     private DateTime? lastUpdated;
 
     [JsonIgnore]
-    public string StatsText => LastUpdated is DateTime updated ? $"{Downloads:N0} downloads · Updated {Ago(updated)}" : "";
+    public string StatsText => LastUpdated is DateTime updated
+        ? string.Format(LocalizationService.Instance["StatsFormat"], Downloads, Ago(updated))
+        : "";
 
     private static string Ago(DateTime updated)
     {
+        var loc = LocalizationService.Instance;
         int days = (int)(DateTime.UtcNow - updated.ToUniversalTime()).TotalDays;
         return days switch
         {
-            < 1 => "today",
-            1 => "yesterday",
-            < 30 => $"{days} days ago",
-            _ => updated.ToLocalTime().ToString("MMM d, yyyy")
+            < 1 => loc["AgoToday"],
+            1 => loc["AgoYesterday"],
+            < 30 => string.Format(loc["AgoDays"], days),
+            _ => updated.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentUICulture)
         };
     }
 

@@ -3,7 +3,9 @@
 ; Non-commercial use only
 
 #define MyAppName "StellarModManager"
-#define MyAppVersion "1.4.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.3.1"
+#endif
 #define MyAppPublisher "Krunk"
 #define MyAppURL "https://github.com/Krunk-theduck/StellarModManager"
 #define MyAppExeName "StellarModManager.exe"

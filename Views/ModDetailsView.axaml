@@ -76,7 +76,7 @@
                         TextWrapping="Wrap"
                         Foreground="{DynamicResource Theme.TextPrimaryBrush}" />
 
-                    <TextBlock Text="Changelog"
+                    <TextBlock Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[Changelog]}"
                         FontSize="16" FontWeight="Bold"
                         IsVisible="{Binding !!SelectedMod.Changelog.Count}"
                         Foreground="{DynamicResource Theme.TextPrimaryBrush}" />

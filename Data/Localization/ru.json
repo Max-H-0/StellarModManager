@@ -38,5 +38,13 @@
   "Download": "Скачать",
   "DetectedGameInstalls": "Обнаруженные установки",
   "ChooseGameFolderManually": "Выбрать вручную",
-  "SelectFolder": "Выбрать"
+  "SelectFolder": "Выбрать",
+  "Changelog": "Список изменений",
+  "SortMostDownloaded": "Самые скачиваемые",
+  "SortRecentlyUpdated": "Недавно обновлённые",
+  "SortName": "Название",
+  "StatsFormat": "{0:N0} скачиваний · Обновлено {1}",
+  "AgoToday": "сегодня",
+  "AgoYesterday": "вчера",
+  "AgoDays": "{0} дн. назад"
 }
