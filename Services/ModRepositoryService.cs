@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using System.Linq; // thumbnailss
+using Avalonia.Platform;
 
 namespace StellarModManager.Services;
 
@@ -20,6 +21,25 @@ public class ModRepositoryService
     public ModRepositoryService()
     {
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("StellarModManager");
+    }
+
+    private static readonly string[] DefaultThumbnailAssets =
+    {
+        "avares://StellarModManager/Assets/Thumbnails/smileyAngry.png",
+        "avares://StellarModManager/Assets/Thumbnails/smileyCry.png",
+        "avares://StellarModManager/Assets/Thumbnails/smileyFrown.png",
+        "avares://StellarModManager/Assets/Thumbnails/smileyGrumpy.png",
+        "avares://StellarModManager/Assets/Thumbnails/smileyTounge.png",
+        "avares://StellarModManager/Assets/Thumbnails/smileyWhat.png"
+    };
+
+    private static Bitmap LoadDefaultThumbnail(OnlineModInfo mod)
+    {
+        int index = Random.Shared.Next(DefaultThumbnailAssets.Length);
+
+        using var stream = AssetLoader.Open(new Uri(DefaultThumbnailAssets[index]));
+
+        return Bitmap.DecodeToWidth(stream, 192);
     }
 
     // request no cache (even tho im almost certain this doesnt work, we still try...)
@@ -150,18 +170,29 @@ public class ModRepositoryService
 
     public async Task LoadThumbnailAsync(OnlineModInfo mod)
     {
-        if (string.IsNullOrEmpty(mod.ThumbnailUrl) || mod.ThumbnailImage != null)
+        if (mod.ThumbnailImage != null)
             return;
+
+        if (string.IsNullOrWhiteSpace(mod.ThumbnailUrl))
+        {
+            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
+            return;
+        }
 
         try
         {
-            byte[] bytes = await httpClient.GetByteArrayAsync(NoCache(mod.ThumbnailUrl));
+            byte[] bytes = await httpClient.GetByteArrayAsync(
+                NoCache(mod.ThumbnailUrl));
+
             using var contentStream = new MemoryStream(bytes);
             mod.ThumbnailImage = Bitmap.DecodeToWidth(contentStream, 192);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Thumbnail loading failed for {mod.Name}: {ex.Message}");
+            Console.WriteLine(
+                $"Thumbnail loading failed for {mod.Name}: {ex.Message}");
+
+            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
         }
     }
 

@@ -30,19 +30,19 @@
                    IsPaneOpen="{Binding IsPaneOpen}"
                    DisplayMode="CompactInline"
                    OpenPaneLength="280"
-                   CompactPaneLength="56"
+                   CompactPaneLength="50"
                    PaneBackground="Transparent">
 
             <SplitView.Pane>
                 <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="4,8,4,8">
 
-                    <Button Grid.Row="1" Classes="ghost icon" Width="48" Height="36"
+                    <Button Grid.Row="1" Classes="ghost icon" Width="42" Height="36"
                             Command="{Binding TogglePaneCommand}"
                             ToolTip.Tip="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[ToggleNavigation]}">
                         <svg:Svg Grid.Column="0"
                             Path="/Assets/Icons/menu.svg"
-                            Width="24"
-                            Height="24"
+                            Width="20"
+                            Height="20"
                             Stretch="Uniform"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Center"/>
@@ -160,16 +160,45 @@
 
                     <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*" Margin="32,24,24,0">
 
-                        <Panel Grid.Row="0" Margin="0,0,0,16">
-                            <TextBlock Classes="pageTitle" IsVisible="{Binding IsBrowsePage}"
-                                       Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavBrowse]}"/>
-                            <TextBlock Classes="pageTitle" IsVisible="{Binding IsLibraryPage}"
-                                       Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavLibrary]}"/>
-                            <TextBlock Classes="pageTitle" IsVisible="{Binding IsUpdatesPage}"
-                                       Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavUpdates]}"/>
-                            <TextBlock Classes="pageTitle" IsVisible="{Binding IsSettingsPage}"
-                                       Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SettingsTitle]}"/>
-                        </Panel>
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                            <Panel>
+                                <TextBlock Classes="pageTitle" IsVisible="{Binding IsBrowsePage}"
+                                           Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavBrowse]}"/>
+                                <TextBlock Classes="pageTitle" IsVisible="{Binding IsLibraryPage}"
+                                           Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavLibrary]}"/>
+                                <TextBlock Classes="pageTitle" IsVisible="{Binding IsUpdatesPage}"
+                                           Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[NavUpdates]}"/>
+                                <TextBlock Classes="pageTitle" IsVisible="{Binding IsSettingsPage}"
+                                           Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SettingsTitle]}"/>
+                            </Panel>
+
+                            <!-- List / compact view switch -->
+                            <Border Grid.Column="1" Classes="segmented" IsVisible="{Binding !IsSettingsPage}">
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <Button Classes="ghost" Classes.selected="{Binding !IsCompactView}"
+                                            Command="{Binding ShowListViewCommand}"
+                                            ToolTip.Tip="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[ViewList]}">
+                                        <svg:Svg Grid.Column="0"
+                                            Path="/Assets/Icons/viewList.svg"
+                                            Width="18"
+                                            Height="18"
+                                            Stretch="Uniform"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"/>                                       </Button>
+                                    <Button Classes="ghost" Classes.selected="{Binding IsCompactView}"
+                                            Command="{Binding ShowCompactViewCommand}"
+                                            ToolTip.Tip="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[ViewCompact]}">
+                                        <svg:Svg Grid.Column="0"
+                                            Path="/Assets/Icons/viewGrid.svg"
+                                            Width="18"
+                                            Height="18"
+                                            Stretch="Uniform"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"/>   
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
 
                         <!-- App update -->
                         <Border Classes="infoBar" Margin="0,0,0,12" IsVisible="{Binding IsUpdateBannerVisible}">
