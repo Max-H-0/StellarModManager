@@ -29,7 +29,7 @@
                    IsVisible="{Binding !SetupRequired}"
                    IsPaneOpen="{Binding IsPaneOpen}"
                    DisplayMode="CompactInline"
-                   OpenPaneLength="280"
+                   OpenPaneLength="180"
                    CompactPaneLength="50"
                    PaneBackground="Transparent">
 
