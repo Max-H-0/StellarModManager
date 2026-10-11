@@ -1,32 +1,38 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:vm="using:StellarModManager.ViewModels"
-    xmlns:models="using:StellarModManager.Models"
-    xmlns:loc="using:StellarModManager.Services"
-    xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
-    x:Class="StellarModManager.Views.OnlineModsView"
-    x:DataType="vm:MainWindowViewModel">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StellarModManager.Controls"
+             xmlns:vm="using:StellarModManager.ViewModels"
+             xmlns:models="using:StellarModManager.Models"
+             xmlns:loc="using:StellarModManager.Services"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             x:Class="StellarModManager.Views.OnlineModsView"
+             x:DataType="vm:MainWindowViewModel">
 
     <Grid RowDefinitions="Auto,Auto,*">
 
         <!-- Toolbar -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
-            <TextBox Grid.Column="0" MaxWidth="320" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                     Text="{Binding SearchText}"
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="9*" MinWidth="95"  MaxWidth="500" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" HorizontalAlignment="Stretch"
                      PlaceholderText="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SearchPlaceholder]}">
                 <TextBox.InnerRightContent>
                     <svg:Svg Grid.Column="0"
-                        Path="/Assets/Icons/search.svg"
-                        Width="16"
-                        Height="16"
-                        Stretch="Uniform"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        Margin="0,0,12,0"/>
+                             Path="/Assets/Icons/search.svg"
+                             Width="16"
+                             Height="16"
+                             Stretch="Uniform"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Center"
+                             Margin="0,0,12,0"/>
                 </TextBox.InnerRightContent>
             </TextBox>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="16,0,8,0">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" Margin="16,0,8,0">
                 <TextBlock Classes="columnHeader" Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SortLabel]}"/>
                 <ComboBox MinWidth="190" SelectedIndex="{Binding SortIndex}">
                     <ComboBoxItem Content="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SortMostDownloaded]}"/>
@@ -35,15 +41,15 @@
                 </ComboBox>
             </StackPanel>
 
-            <Button Grid.Column="2" Classes="ghost" Command="{Binding RefreshModsCommand}">
+            <Button Grid.Column="3" Classes="ghost" Command="{Binding RefreshModsCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <svg:Svg Grid.Column="0"
-                        Path="/Assets/Icons/refresh.svg"
-                        Width="16"
-                        Height="16"
-                        Stretch="Uniform"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"/>
+                             Path="/Assets/Icons/refresh.svg"
+                             Width="16"
+                             Height="16"
+                             Stretch="Uniform"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[Refresh]}"/>
                 </StackPanel>
             </Button>
@@ -109,12 +115,20 @@
                  IsVisible="{Binding IsCompactView}"
                  ItemsSource="{Binding VisibleOnlineMods}"
                  SelectedItem="{Binding BrowseSelection}">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <c:GridWrapPanel ItemWidth="225" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="models:OnlineModInfo">
                     <Grid RowDefinitions="Auto,Auto">
-                        <Border Classes="cardThumbnail">
-                            <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill"/>
-                        </Border>
+
+                        <c:AspectRatio WidthParameter="16" HeightParameter="9">
+                            <Border Classes="cardThumbnail">
+                                <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill"/>
+                            </Border>
+                        </c:AspectRatio>
 
                         <StackPanel Grid.Row="1" Margin="12,10,12,12" Spacing="2">
                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"

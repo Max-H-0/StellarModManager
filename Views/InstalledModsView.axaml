@@ -1,5 +1,6 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StellarModManager.Controls"
              xmlns:vm="using:StellarModManager.ViewModels"
              xmlns:models="using:StellarModManager.Models"
              xmlns:loc="using:StellarModManager.Services"
@@ -62,12 +63,20 @@
                  IsVisible="{Binding IsCompactView}"
                  ItemsSource="{Binding InstalledMods}"
                  SelectedItem="{Binding LibrarySelection}">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <c:GridWrapPanel ItemWidth="225" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="models:InstalledModInfo">
                     <Grid RowDefinitions="Auto,Auto">
-                        <Border Classes="cardThumbnail">
-                            <Image Source="{Binding Online.ThumbnailImage, FallbackValue={x:Null}}" Stretch="UniformToFill"/>
-                        </Border>
+                        
+                        <c:AspectRatio WidthParameter="16" HeightParameter="9">
+                            <Border Classes="cardThumbnail">
+                                <Image Source="{Binding Online.ThumbnailImage, FallbackValue={x:Null}}" Stretch="UniformToFill"/>
+                            </Border>
+                        </c:AspectRatio>
 
                         <StackPanel Grid.Row="1" Margin="12,10,12,12" Spacing="2">
                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
