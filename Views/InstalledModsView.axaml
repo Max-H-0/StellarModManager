@@ -65,7 +65,7 @@
                  SelectedItem="{Binding LibrarySelection}">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <c:GridWrapPanel ItemWidth="250" />
+                    <c:GridWrapPanel ItemWidth="225" />
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
