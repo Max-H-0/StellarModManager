@@ -19,7 +19,8 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" HorizontalAlignment="Stretch"
-                     PlaceholderText="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SearchPlaceholder]}">
+                     PlaceholderText="{Binding Source={x:Static loc:LocalizationService.Instance}, Path=[SearchPlaceholder]}"
+                     Text="{Binding SearchText}">
                 <TextBox.InnerRightContent>
                     <svg:Svg Grid.Column="0"
                              Path="/Assets/Icons/search.svg"
