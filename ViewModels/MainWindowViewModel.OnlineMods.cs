@@ -12,16 +12,26 @@ namespace StellarModManager.ViewModels;
 
 public partial class MainWindowViewModel
 {
-    public ObservableCollection<OnlineModInfo> OnlineMods { get; } = [];
-    // OnlineMods filtered by SearchText and sorted by SortIndex
-    public ObservableCollection<OnlineModInfo> VisibleOnlineMods { get; } = [];
     private readonly ModRepositoryService _repositoryService = new();
 
-    [ObservableProperty]
-    public partial int SortIndex { get; set; }
+    public ObservableCollection<OnlineModInfo> OnlineMods { get; } = [];
+    public ObservableCollection<OnlineModInfo> VisibleOnlineMods { get; } = [];  // OnlineMods filtered by SearchText and sorted by SortIndex
 
-    [ObservableProperty]
-    public partial string SearchText { get; set; } = "";
+    [ObservableProperty] public partial int SortIndex { get; set; }
+    [ObservableProperty] public partial string SearchText { get; set; } = "";
+
+    
+    partial void OnSortIndexChanged(int value)
+    {
+        ApplyOnlineView();
+        PersistSettings();
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        ApplyOnlineView();
+    }
+
 
     [RelayCommand]
     private async Task RefreshMods()
@@ -30,24 +40,21 @@ public partial class MainWindowViewModel
 
         try
         {
-            loaded = await _repositoryService.GetModsAsync(
-                "https://jollyname.dev/mods.json"
-            );
+            loaded = await _repositoryService.GetModsAsync(url: "https://jollyname.dev/mods.json");
         }
-        // Catch failed refresh
-        catch (Exception ex)
+        catch (Exception ex) // Catch failed refresh
         {
             ReportError("StatusRefreshFailed", ex.Message);
             return;
         }
+
 
         List<OnlineModInfo> mods = loaded.Mods;
 
         // A repository that failed to answer keeps the card already on screen.
         foreach (var gone in OnlineMods.Where(o => mods.All(m => m.Id != o.Id)).ToList())
         {
-            if (loaded.Failed(gone.RepoOwner, gone.RepoName))
-                continue;
+            if (loaded.Failed(gone.RepoOwner, gone.RepoName)) continue;
 
             OnlineMods.Remove(gone);
         }
@@ -102,7 +109,9 @@ public partial class MainWindowViewModel
         }
 
         foreach (var mod in OnlineMods)
+        {
             _ = _repositoryService.LoadThumbnailAsync(mod);
+        }
 
 
         RefreshUpdateStatuses();
@@ -112,13 +121,6 @@ public partial class MainWindowViewModel
         ApplyOnlineView();
     }
 
-    partial void OnSortIndexChanged(int value)
-    {
-        ApplyOnlineView();
-        PersistSettings();
-    }
-
-    partial void OnSearchTextChanged(string value) => ApplyOnlineView();
 
     private void ApplyOnlineView()
     {
@@ -136,16 +138,22 @@ public partial class MainWindowViewModel
 
         // Update in place so the list keeps its selection and scroll position
         foreach (var gone in VisibleOnlineMods.Except(sorted).ToList())
+        {
             VisibleOnlineMods.Remove(gone);
+        }
 
         for (int i = 0; i < sorted.Count; i++)
         {
             int current = VisibleOnlineMods.IndexOf(sorted[i]);
 
             if (current == -1)
+            {
                 VisibleOnlineMods.Insert(i, sorted[i]);
+            }
             else if (current != i)
+            {
                 VisibleOnlineMods.Move(current, i);
+            }
         }
     }
 }

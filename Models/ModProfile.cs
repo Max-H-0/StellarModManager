@@ -11,15 +11,8 @@ public partial class ModProfile : ObservableObject
 
     public List<string> DeployedModIds { get; set; } = [];
 
-    [ObservableProperty]
-    public partial string Name { get; set; } = "";
-
-    [ObservableProperty]
-    public partial bool IsActive { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsEditing { get; set; }
-
-    [ObservableProperty]
-    public partial string EditName { get; set; } = "";
+    [ObservableProperty] public partial string Name { get; set; } = "";
+    [ObservableProperty] public partial bool IsActive { get; set; }
+    [ObservableProperty] public partial bool IsEditing { get; set; }
+    [ObservableProperty] public partial string EditName { get; set; } = "";
 }

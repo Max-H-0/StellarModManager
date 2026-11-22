@@ -1,25 +1,26 @@
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using StellarModManager.Models;
-using StellarModManager.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using StellarModManager.Models;
+using StellarModManager.Services;
 
 namespace StellarModManager.ViewModels;
 
 public partial class MainWindowViewModel
 {
+    private HashSet<string> _managedModPaths = new(ProfileFiles.PathComparer);
+    private InstalledModInfo? _modPendingRemoval;
+    private OnlineModInfo? _modPendingInstall;
+
+
     public ObservableCollection<InstalledModInfo> InstalledMods { get; } = [];
     public ObservableCollection<InstalledModInfo> LibraryMods { get; } = [];
     public ObservableCollection<InstalledModInfo> AvailableModUpdates { get; } = [];
-    private HashSet<string> _managedModPaths = new(ProfileFiles.PathComparer);
-
-    private InstalledModInfo? _modPendingRemoval;
-    private OnlineModInfo? _modPendingInstall;
 
     [ObservableProperty] public partial bool IsConfirmRemoveOpen { get; set; }
     [ObservableProperty] public partial string ConfirmRemoveTitle { get; set; } = "";
@@ -28,22 +29,160 @@ public partial class MainWindowViewModel
     [ObservableProperty] public partial bool IsConfirmDependenciesOpen { get; set; }
     [ObservableProperty] public partial string ConfirmDependenciesMessage { get; set; } = "";
 
-    private void ShowInstalledMods(List<ProfileMod> mods)
-    {
-        var updatesId = UpdatesSelection?.Id;
-        _managedModPaths = mods.SelectMany(mod => mod.Files).ToHashSet(ProfileFiles.PathComparer);
-        InstalledMods.Clear();
-        foreach (var installed in mods)
-            InstalledMods.Add(installed.Mod);
-        ShowLibraryMods();
-        RefreshUpdateStatuses(updatesId);
-    }
 
     [RelayCommand]
     private void RefreshLibrary()
     {
         if (!IsModOperationInProgress)
+        {
             ShowLibraryMods();
+        }
+    }
+
+    [RelayCommand]
+    private Task InstallMod(OnlineModInfo mod) => InstallModAsync(mod, dependenciesConfirmed: false);
+
+    [RelayCommand]
+    private async Task ConfirmDependencies()
+    {
+        var mod = _modPendingInstall;
+
+        CancelDependencies();
+
+        if (mod != null)
+        {
+            await InstallModAsync(mod, dependenciesConfirmed: true);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelDependencies()
+    {
+        IsConfirmDependenciesOpen = false;
+        _modPendingInstall = null;
+    }
+
+    [RelayCommand]
+    private async Task RequestRemoveMod(InstalledModInfo mod)
+    {
+        if (mod.IsExternal || IsModOperationInProgress || IsConfirmRemoveOpen || IsConfirmDependenciesOpen) return;
+
+        var dependents = DependencyResolver.FindDependents(mod, InstalledMods);
+        if (dependents.Count > 0)
+        {
+            var names = string.Join(", ", dependents.Select(d => d.Name));
+            _modPendingRemoval = mod;
+            ShowRemoveConfirmation("ConfirmRemoveTitle", "ConfirmRemoveButton", "ConfirmRemoveDependentsMessage", names, mod.Name);
+        }
+        else if (ConfirmBeforeRemove)
+        {
+            _modPendingRemoval = mod;
+            ShowRemoveConfirmation("ConfirmRemoveTitle", "ConfirmRemoveButton", "ConfirmRemoveMessage", mod.Name);
+        }
+        else
+        {
+            await UninstallMod(mod);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ConfirmRemove()
+    {
+        var profile = _profilePendingDeletion;
+        var mod = _modPendingRemoval;
+
+        CancelRemove();
+
+        if (profile != null)
+        {
+            await DeleteProfileAsync(profile);
+        }
+        else if (mod != null)
+        {
+            await UninstallMod(mod);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelRemove()
+    {
+        IsConfirmRemoveOpen = false;
+        _modPendingRemoval = null;
+        _profilePendingDeletion = null;
+    }
+
+    [RelayCommand]
+    private async Task UpdateMod(InstalledModInfo mod)
+    {
+        if (!TryBeginModOperation()) return;
+
+        try
+        {
+            await UpdateInstalledMod(mod);
+        }
+        finally
+        {
+            IsModOperationInProgress = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task UpdateAllMods()
+    {
+        if (!TryBeginModOperation()) return;
+
+        try
+        {
+            foreach (var id in AvailableModUpdates.Select(m => m.Id).ToList())
+            {
+                var mod = InstalledMods.FirstOrDefault(m => SameId(m.Id, id));
+
+                if (mod != null)
+                {
+                    await UpdateInstalledMod(mod);
+                }
+            }
+        }
+        finally
+        {
+            IsModOperationInProgress = false;
+        }
+    }
+
+
+    private static bool SameId(string id, string? other)
+    {
+        return string.Equals(id, other, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNewerThan(string? candidate, string? current)
+    {
+        if (!Version.TryParse(candidate, out var candidateVersion)) return false;
+
+        if (Version.TryParse(current, out var currentVersion))
+        {
+            return candidateVersion > currentVersion;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+
+    private void ShowInstalledMods(List<ProfileMod> mods)
+    {
+        var updatesId = UpdatesSelection?.Id;
+        _managedModPaths = mods.SelectMany(mod => mod.Files).ToHashSet(ProfileFiles.PathComparer);
+        InstalledMods.Clear();
+
+        foreach (var installed in mods)
+        {
+            InstalledMods.Add(installed.Mod);
+        }
+
+        ShowLibraryMods();
+        RefreshUpdateStatuses(updatesId);
     }
 
     private void ShowLibraryMods()
@@ -51,21 +190,29 @@ public partial class MainWindowViewModel
         var selection = LibrarySelection;
         var external = _profileStore == null ? [] : ExternalModScanner.Scan(GamePath, _managedModPaths);
         LibraryMods.Clear();
+
         foreach (var mod in InstalledMods.Concat(external))
+        {
             LibraryMods.Add(mod);
+        }
 
-        LibrarySelection = selection == null ? null : LibraryMods.FirstOrDefault(mod =>
-            mod.IsExternal == selection.IsExternal && (mod.IsExternal
-                ? ProfileFiles.PathComparer.Equals(mod.Id, selection.Id)
-                : SameId(mod.Id, selection.Id)));
+        if (selection is not null)
+        {
+            LibrarySelection = LibraryMods.FirstOrDefault
+            (
+                mod => mod.IsExternal == selection.IsExternal && (mod.IsExternal ? ProfileFiles.PathComparer.Equals(mod.Id, selection.Id) : SameId(mod.Id, selection.Id))
+            );
+        }
+        else
+        {
+            LibrarySelection = null;
+        }
     }
-
-    private static bool SameId(string id, string? other) =>
-        string.Equals(id, other, StringComparison.OrdinalIgnoreCase);
 
     private void RefreshUpdateStatuses(string? previousSelection = null)
     {
         var updatesId = previousSelection ?? UpdatesSelection?.Id;
+
         foreach (var online in OnlineMods)
         {
             online.IsInstalled = InstalledMods.Any(m => SameId(m.Id, online.Id));
@@ -77,36 +224,44 @@ public partial class MainWindowViewModel
             installed.Online = OnlineMods.FirstOrDefault(m => SameId(m.Id, installed.Id));
             var online = installed.Online;
             var latest = online?.Version;
-            var cached = _packages.Find(installed.Id);
-            if (cached != null && IsNewer(cached.Mod.Version, latest))
-                latest = cached.Mod.Version;
 
-            installed.IsUpdateAvailable = IsNewer(latest, installed.Version);
+            var cached = _packages.FindPackage(installed.Id);
+            if (cached != null && IsNewerThan(cached.Mod.Version, latest))
+            {
+                latest = cached.Mod.Version;
+            }
+
+            installed.IsUpdateAvailable = IsNewerThan(latest, installed.Version);
             installed.LatestVersion = installed.IsUpdateAvailable ? latest : null;
             installed.UpdateNotes = null;
+
             if (online != null && installed.IsUpdateAvailable)
             {
                 online.HasUpdate = true;
+
                 if (Version.TryParse(installed.Version, out var installedVersion))
+                {
                     _ = LoadUpdateNotesAsync(installed, online, installedVersion);
+                }
             }
         }
 
         RefreshDependencyStatuses();
         AvailableModUpdates.Clear();
+
         foreach (var installed in InstalledMods.Where(m => m.IsUpdateAvailable))
+        {
             AvailableModUpdates.Add(installed);
+        }
+
         UpdatesSelection = AvailableModUpdates.FirstOrDefault(m => SameId(m.Id, updatesId));
         ShowDetails();
     }
 
-    private static bool IsNewer(string? candidate, string? current) =>
-        Version.TryParse(candidate, out var candidateVersion) &&
-        (!Version.TryParse(current, out var currentVersion) || candidateVersion > currentVersion);
-
     private async Task LoadUpdateNotesAsync(InstalledModInfo installed, OnlineModInfo online, Version installedVersion)
     {
         await _repositoryService.LoadChangelogAsync(online);
+
         installed.UpdateNotes = string.Join("\n\n", online.Changelog
             .Where(e => e.Version > installedVersion)
             .Select(e => $"v{e.Version}\n{e.Notes}"));
@@ -115,6 +270,7 @@ public partial class MainWindowViewModel
     private void RefreshDependencyStatuses()
     {
         var loc = LocalizationService.Instance;
+
         foreach (var installed in InstalledMods)
         {
             var (_, missing) = DependencyResolver.ResolveInstall(installed, InstalledMods, _ => null);
@@ -128,16 +284,14 @@ public partial class MainWindowViewModel
     private ModInfo? FindAvailableMod(string id)
     {
         var online = OnlineMods.FirstOrDefault(m => SameId(m.Id, id));
-        return (ModInfo?)online ?? _packages.Find(id)?.Mod;
-    }
 
-    [RelayCommand]
-    private Task InstallMod(OnlineModInfo mod) => InstallModAsync(mod, dependenciesConfirmed: false);
+        return (ModInfo?)online ?? _packages.FindPackage(id)?.Mod;
+    }
 
     private async Task InstallModAsync(OnlineModInfo mod, bool dependenciesConfirmed)
     {
-        if (!TryBeginModOperation())
-            return;
+        if (!TryBeginModOperation()) return;
+
         try
         {
             var (dependencies, missing) = DependencyResolver.ResolveInstall(mod, InstalledMods, FindAvailableMod);
@@ -159,16 +313,24 @@ public partial class MainWindowViewModel
             var store = _profileStore!;
             var active = ActiveProfile!.Id;
             var install = new List<ModPackage>();
+
             foreach (var dependency in dependencies)
+            {
                 install.Add(await GetInstallPackage(dependency));
+            }
             install.Add(await GetInstallPackage(mod));
 
             mod.IsInstalling = true;
             ShowProfileState(await Task.Run(() => store.ChangeInstalledMods(active, install)));
+
             if (dependencies.Count == 0)
+            {
                 ReportSuccess("StatusInstalled", mod.Name);
+            }
             else
+            {
                 ReportSuccess("StatusInstalledWithDependencies", mod.Name, names);
+            }
         }
         catch (Exception ex)
         {
@@ -185,8 +347,7 @@ public partial class MainWindowViewModel
     {
         if (mod is not OnlineModInfo online)
         {
-            return _packages.Find(mod.Id, mod.Version)
-                ?? throw new FileNotFoundException($"No cached package was found for {mod.Name}.");
+            return _packages.FindPackage(mod.Id, mod.Version) ?? throw new FileNotFoundException($"No cached package was found for {mod.Name}.");
         }
 
         online.IsInstalling = true;
@@ -202,46 +363,6 @@ public partial class MainWindowViewModel
         }
     }
 
-    [RelayCommand]
-    private async Task ConfirmDependencies()
-    {
-        var mod = _modPendingInstall;
-        CancelDependencies();
-        if (mod != null)
-            await InstallModAsync(mod, dependenciesConfirmed: true);
-    }
-
-    [RelayCommand]
-    private void CancelDependencies()
-    {
-        IsConfirmDependenciesOpen = false;
-        _modPendingInstall = null;
-    }
-
-    [RelayCommand]
-    private async Task RequestRemoveMod(InstalledModInfo mod)
-    {
-        if (mod.IsExternal || IsModOperationInProgress || IsConfirmRemoveOpen || IsConfirmDependenciesOpen)
-            return;
-
-        var dependents = DependencyResolver.FindDependents(mod, InstalledMods);
-        if (dependents.Count > 0)
-        {
-            var names = string.Join(", ", dependents.Select(d => d.Name));
-            _modPendingRemoval = mod;
-            ShowRemoveConfirmation("ConfirmRemoveTitle", "ConfirmRemoveButton", "ConfirmRemoveDependentsMessage", names, mod.Name);
-        }
-        else if (ConfirmBeforeRemove)
-        {
-            _modPendingRemoval = mod;
-            ShowRemoveConfirmation("ConfirmRemoveTitle", "ConfirmRemoveButton", "ConfirmRemoveMessage", mod.Name);
-        }
-        else
-        {
-            await UninstallMod(mod);
-        }
-    }
-
     private void ShowRemoveConfirmation(string title, string button, string message, params object[] args)
     {
         var loc = LocalizationService.Instance;
@@ -251,35 +372,16 @@ public partial class MainWindowViewModel
         IsConfirmRemoveOpen = true;
     }
 
-    [RelayCommand]
-    private async Task ConfirmRemove()
-    {
-        var profile = _profilePendingDeletion;
-        var mod = _modPendingRemoval;
-        CancelRemove();
-        if (profile != null)
-            await DeleteProfileAsync(profile);
-        else if (mod != null)
-            await UninstallMod(mod);
-    }
-
-    [RelayCommand]
-    private void CancelRemove()
-    {
-        IsConfirmRemoveOpen = false;
-        _modPendingRemoval = null;
-        _profilePendingDeletion = null;
-    }
-
     private async Task UninstallMod(InstalledModInfo mod)
     {
-        if (!TryBeginModOperation())
-            return;
+        if (!TryBeginModOperation()) return;
+
         mod.IsRemoving = true;
         try
         {
             var store = _profileStore!;
             var active = ActiveProfile!.Id;
+
             ShowProfileState(await Task.Run(() => store.ChangeInstalledMods(active, [], mod.Id)));
             ReportSuccess("StatusRemoved", mod.Name);
         }
@@ -294,32 +396,18 @@ public partial class MainWindowViewModel
         }
     }
 
-    [RelayCommand]
-    private async Task UpdateMod(InstalledModInfo mod)
-    {
-        if (!TryBeginModOperation())
-            return;
-        try
-        {
-            await UpdateInstalledMod(mod);
-        }
-        finally
-        {
-            IsModOperationInProgress = false;
-        }
-    }
-
     private async Task UpdateInstalledMod(InstalledModInfo mod)
     {
         var version = mod.LatestVersion;
-        if (!mod.IsUpdateAvailable || version == null)
-            return;
+
+        if (!mod.IsUpdateAvailable || version == null) return;
+
 
         mod.IsUpdating = true;
         mod.UpdateProgress = 0;
         try
         {
-            var package = _packages.Find(mod.Id, version);
+            var package = _packages.FindPackage(mod.Id, version);
             if (package == null)
             {
                 var online = OnlineMods.FirstOrDefault(m => SameId(m.Id, mod.Id) && m.Version == version);
@@ -345,26 +433,6 @@ public partial class MainWindowViewModel
         finally
         {
             mod.IsUpdating = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task UpdateAllMods()
-    {
-        if (!TryBeginModOperation())
-            return;
-        try
-        {
-            foreach (var id in AvailableModUpdates.Select(m => m.Id).ToList())
-            {
-                var mod = InstalledMods.FirstOrDefault(m => SameId(m.Id, id));
-                if (mod != null)
-                    await UpdateInstalledMod(mod);
-            }
-        }
-        finally
-        {
-            IsModOperationInProgress = false;
         }
     }
 }

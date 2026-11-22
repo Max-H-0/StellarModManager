@@ -53,8 +53,8 @@ public partial class MainWindowViewModel
     [RelayCommand]
     private async Task ToggleGame()
     {
-        if (!TryBeginModOperation(requireProfile: !IsGameRunning))
-            return;
+        if (!TryBeginModOperation(requireProfile: !IsGameRunning)) return;
+
         try
         {
             if (IsGameRunning) StopGame();
@@ -100,10 +100,10 @@ public partial class MainWindowViewModel
         }
     }
 
-
     private FileInfo? FindGameExecutable()
     {
         var path = Path.Combine(GamePath, GameLocatorService.ExecutableName);
+
         return Path.Exists(path) ? new FileInfo(path) : null;
     }
 

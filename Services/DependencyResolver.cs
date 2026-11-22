@@ -7,23 +7,25 @@ namespace StellarModManager.Services;
 
 public static class DependencyResolver
 {
-    internal static (List<ModInfo> ToInstall, List<string> Missing) ResolveInstall(
+    public static (List<ModInfo> ToInstall, List<string> Missing) ResolveInstall(
         ModInfo root, IEnumerable<InstalledModInfo> installed, Func<string, ModInfo?> findAvailable)
     {
         var installedById = installed.ToDictionary(mod => mod.Id, StringComparer.OrdinalIgnoreCase);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { root.Id };
         var toInstall = new List<ModInfo>();
         var missing = new List<string>();
+
         Visit(root);
+
         return (toInstall, missing);
+
 
         void Visit(ModInfo mod)
         {
             foreach (var raw in NeedsOf(mod))
             {
                 var id = raw?.Trim();
-                if (string.IsNullOrEmpty(id) || !seen.Add(id))
-                    continue;
+                if (string.IsNullOrEmpty(id) || !seen.Add(id)) continue;
 
                 if (installedById.TryGetValue(id, out var existing))
                 {
@@ -31,8 +33,7 @@ public static class DependencyResolver
                     continue;
                 }
 
-                var available = findAvailable(id);
-                if (available == null)
+                if (findAvailable(id) is not ModInfo available)
                 {
                     missing.Add(id);
                     continue;
@@ -43,15 +44,7 @@ public static class DependencyResolver
             }
         }
     }
-
-    private static List<string> NeedsOf(ModInfo mod)
-    {
-        if (mod.Needs is { Count: > 0 })
-            return mod.Needs;
-
-        return (mod as InstalledModInfo)?.Online?.Needs ?? [];
-    }
-
+        
     // Installed mods that have needs
     public static List<InstalledModInfo> FindDependents(InstalledModInfo target, IEnumerable<InstalledModInfo> installed)
     {
@@ -59,5 +52,16 @@ public static class DependencyResolver
             .Where(mod => !mod.Id.Equals(target.Id, StringComparison.OrdinalIgnoreCase))
             .Where(mod => NeedsOf(mod).Any(need => (need ?? "").Trim().Equals(target.Id, StringComparison.OrdinalIgnoreCase)))
             .ToList();
+    }
+
+
+    private static List<string> NeedsOf(ModInfo mod)
+    {
+        if (mod.Dependencies is { Count: > 0 })
+        {
+            return mod.Dependencies;
+        }
+
+        return (mod as InstalledModInfo)?.Online?.Dependencies ?? [];
     }
 }

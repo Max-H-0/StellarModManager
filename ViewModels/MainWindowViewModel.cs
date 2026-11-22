@@ -1,37 +1,23 @@
-﻿using Avalonia.Threading;
+﻿using System;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StellarModManager.Services;
-using System;
 
 namespace StellarModManager.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    [ObservableProperty]
-    public partial string GamePath { get; set; } = "No game selected";
-
-    [ObservableProperty]
-    public partial string MelonLoaderStatusText { get; set; } = "";
-
-    // Result of the last mod operation, shown in an info bar
-    [ObservableProperty]
-    public partial string? StatusMessage { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsStatusError { get; set; }
-
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer _checkProcessTimer = new() { Interval = TimeSpan.FromSeconds(10) }; // not sure what the ideal value here would be
 
-    private readonly SettingsService _settingsService = new();
 
     public MainWindowViewModel()
     {
         LoadAvailableThemes();
         LoadAvailableLanguages();
 
-        var appSettings = _settingsService.LoadAppSettings();
+        var appSettings = SettingsService.LoadAppSettings();
         SelectedTheme = appSettings.Theme;
         SelectedLanguage = appSettings.Language;
         ConfirmBeforeRemove = appSettings.ConfirmBeforeRemove;
@@ -41,12 +27,12 @@ public partial class MainWindowViewModel : ViewModelBase
         SortIndex = appSettings.ModSort;
         IsCompactView = appSettings.CompactModList;
 
-        _themeService.ApplyTheme(_themeService.LoadTheme(SelectedTheme));
+        ThemeService.ApplyTheme(ThemeService.LoadTheme(SelectedTheme));
 
         if (!LocalizationService.Instance.TrySetLanguage(SelectedLanguage, out string usedLanguage))
         {
             SelectedLanguage = appSettings.Language = usedLanguage;
-            _settingsService.SaveAppSettings(appSettings);
+            SettingsService.SaveAppSettings(appSettings);
         }
 
         _statusTimer.Tick += (_, _) => DismissStatus();
@@ -57,16 +43,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _updateCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
         _updateCheckTimer.Tick += async (_, _) => await RefreshMods();
 
-        var profile = _settingsService.LoadGameProfile();
+        var profile = SettingsService.LoadGameProfile();
 
         if (profile != null)
         {
             GamePath = profile.GamePath;
 
-            var detector = new MelonLoaderDetector();
-            var result = detector.CheckInstallation(profile.GamePath);
-
-            if (result == MelonLoaderStatus.Installed)
+            if (MelonLoaderDetector.CheckInstallation(profile.GamePath) is MelonLoaderStatus.Installed)
             {
                 IsMelonLoaderValid = true;
                 SetupRequired = false;
@@ -94,10 +77,24 @@ public partial class MainWindowViewModel : ViewModelBase
 
     }
 
-    // Successes fade out on their own; errors stay until dismissed
-    private void ReportSuccess(string key, params object[] args) => ShowStatus(LocalizationService.Instance.Format(key, args), false);
 
-    private void ReportError(string key, params object[] args) => ShowStatus(LocalizationService.Instance.Format(key, args), true);
+    [ObservableProperty] public partial string GamePath { get; set; } = "No game selected";
+    [ObservableProperty] public partial string MelonLoaderStatusText { get; set; } = "";
+    [ObservableProperty] public partial string? StatusMessage { get; set; } // Result of the last mod operation, shown in an info bar
+    [ObservableProperty] public partial bool IsStatusError { get; set; }
+
+
+    [RelayCommand]
+    private void DismissStatus()
+    {
+        _statusTimer.Stop();
+        StatusMessage = null;
+    }
+
+
+    // Successes fade out on their own; errors stay until dismissed
+    private void ReportSuccess(string key, params object[] args) => ShowStatus(LocalizationService.Instance.Format(key, args), isError: false);
+    private void ReportError(string key, params object[] args) => ShowStatus(LocalizationService.Instance.Format(key, args), isError: true);
 
     private void ShowStatus(string message, bool isError)
     {
@@ -106,13 +103,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _statusTimer.Stop();
         if (!isError)
+        {
             _statusTimer.Start();
-    }
-
-    [RelayCommand]
-    private void DismissStatus()
-    {
-        _statusTimer.Stop();
-        StatusMessage = null;
+        }
     }
 }

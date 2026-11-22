@@ -5,40 +5,41 @@ using System.Text.Json;
 
 namespace StellarModManager.Services;
 
-public class SettingsService
+public static class SettingsService
 {
-    private readonly string _gameProfilePath = Path.Combine(AppContext.BaseDirectory, "Data", "settings.json");
-    private readonly string _appSettingsPath = Path.Combine(AppContext.BaseDirectory, "Data", "appsettings.json");
+    private static readonly string GameProfilePath = Path.Combine(AppContext.BaseDirectory, "Data", "settings.json");
+    private static readonly string AppSettingsPath = Path.Combine(AppContext.BaseDirectory, "Data", "appsettings.json");
 
-    public void SaveGameProfile(GameProfile profile)
+
+    public static void SaveGameProfile(GameProfile profile)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_gameProfilePath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(GameProfilePath)!);
         string json = JsonSerializer.Serialize(profile);
-        File.WriteAllText(_gameProfilePath, json);
+        File.WriteAllText(GameProfilePath, json);
     }
 
-    public GameProfile? LoadGameProfile()
+    public static GameProfile? LoadGameProfile()
     {
-        if (!File.Exists(_gameProfilePath))
+        if (!File.Exists(GameProfilePath))
             return null;
 
-        string json = File.ReadAllText(_gameProfilePath);
+        string json = File.ReadAllText(GameProfilePath);
         return JsonSerializer.Deserialize<GameProfile>(json);
     }
 
-    public void SaveAppSettings(AppSettings settings)
+    public static void SaveAppSettings(AppSettings settings)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_appSettingsPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(AppSettingsPath)!);
         string json = JsonSerializer.Serialize(settings);
-        File.WriteAllText(_appSettingsPath, json);
+        File.WriteAllText(AppSettingsPath, json);
     }
 
-    public AppSettings LoadAppSettings()
+    public static AppSettings LoadAppSettings()
     {
-        if (!File.Exists(_appSettingsPath))
+        if (!File.Exists(AppSettingsPath))
             return new AppSettings();
 
-        string json = File.ReadAllText(_appSettingsPath);
+        string json = File.ReadAllText(AppSettingsPath);
         return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
     }
 }

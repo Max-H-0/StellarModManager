@@ -11,39 +11,28 @@ namespace StellarModManager.ViewModels;
 
 public partial class MainWindowViewModel
 {
-    private readonly AppUpdatingService _appUpdatingService = new();
-
-    [ObservableProperty]
-    public partial bool IsUpdateAvailable { get; set; }
-
-    [ObservableProperty]
+    [ObservableProperty] public partial bool IsUpdateAvailable { get; set; }
+    [ObservableProperty] public partial bool IsUpdatePanelOpen { get; set; }
+    [ObservableProperty] public partial bool IsUpdateBannerVisible { get; set; }
+    [ObservableProperty] public partial bool IsDownloadingUpdate { get; set; }
+    [ObservableProperty] public partial double DownloadProgress { get; set; }
+    
     [NotifyPropertyChangedFor(nameof(AvailableUpdateText))]
-    public partial UpdateInfo? AvailableUpdate { get; set; }
+    [ObservableProperty] public partial UpdateInfo? AvailableUpdate { get; set; }
 
-    public string AvailableUpdateText => AvailableUpdate is null
-        ? "" : LocalizationService.Instance.Format("NewVersionFormat", AvailableUpdate.Version);
+    public string AvailableUpdateText => AvailableUpdate is null ? "" : LocalizationService.Instance.Format("NewVersionFormat", AvailableUpdate.Version);
 
-    [ObservableProperty]
-    public partial bool IsUpdatePanelOpen { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsUpdateBannerVisible { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsDownloadingUpdate { get; set; }
-
-    [ObservableProperty]
-    public partial double DownloadProgress { get; set; }
 
     public async Task CheckForAppUpdates()
     {
-        var update = await _appUpdatingService.CheckAsync();
+        var update = await AppUpdatingService.CheckAsync();
         if (update is null) return;
 
         AvailableUpdate = update;
         IsUpdateAvailable = true;
         IsUpdateBannerVisible = true;
     }
+
 
     [RelayCommand]
     private void OpenUpdatePanel()
@@ -84,7 +73,7 @@ public partial class MainWindowViewModel
         DownloadProgress = 0;
 
         var progress = new Progress<double>(percent => DownloadProgress = percent);
-        await _appUpdatingService.DownloadAndInstallUpdateAsync(AvailableUpdate, progress);
+        await AppUpdatingService.DownloadAndInstallUpdateAsync(AvailableUpdate, progress);
 
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
         {

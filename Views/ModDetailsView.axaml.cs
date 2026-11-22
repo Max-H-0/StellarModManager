@@ -9,10 +9,12 @@ public partial class ModDetailsView : UserControl
 {
     private MainWindowViewModel? _viewModel;
 
+
     public ModDetailsView()
     {
         InitializeComponent();
     }
+
 
     // Start each newly selected mod at the top of the pane
     protected override void OnDataContextChanged(EventArgs e)
@@ -28,6 +30,8 @@ public partial class ModDetailsView : UserControl
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainWindowViewModel.DetailsMod))
+        {
             DetailsScroll.ScrollToHome();
+        }
     }
 }

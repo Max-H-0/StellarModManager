@@ -15,6 +15,50 @@ public record ModTag(string Text, bool IsAssisted = false, bool IsVibecoded = fa
 
 public partial class OnlineModInfo : ModInfo
 {
+    // I just put AI tags in here so they can't be used as regular tags
+    private static readonly HashSet<string> ReservedTags = new(StringComparer.OrdinalIgnoreCase)  { "ai-free", "ai-assisted", "vibecoded", "active", "inactive" };
+
+    public string RepoName { get; set; } = "";
+    public string RepoOwner { get; set; } = "";
+
+    [JsonPropertyName("downloadUrl")] public string DownloadUrl { get; set; } = "";
+
+    [JsonIgnore] public List<ModTag> _Tags { get; private set; } = []; // TODO: please rename sensibly
+    [JsonIgnore] public List<string> ImageUrls { get; set; } = [];
+    [JsonIgnore] public string ThumbnailUrl { get; set; } = ""; // JsonIgnore is a "lazy fix hehe" :o
+    [JsonIgnore] public bool GalleryLoaded { get; set; }
+    [JsonIgnore] public ObservableCollection<Bitmap> GalleryImages { get; } = []; 
+    [JsonIgnore] public ObservableCollection<ChangelogEntry> Changelog { get; } = [];
+    [JsonIgnore] public Task? ChangelogTask { get; set; }
+
+    [ObservableProperty] public partial Bitmap? ThumbnailImage { get; set; }
+    [ObservableProperty] public partial double DownloadProgress { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(DownloadsText))]
+    [ObservableProperty] public partial long Downloads { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(UpdatedText))]
+    [ObservableProperty] public partial DateTime? LastUpdated { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState), nameof(ShowNoState))]
+    [ObservableProperty] public partial bool IsInstalling { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState), nameof(ShowNoState))]
+    [ObservableProperty] public partial bool IsInstalled { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState))]
+    [ObservableProperty] public partial bool HasUpdate { get; set; } // Set when the installed copy is older than this version
+
+    [JsonIgnore] public string? RepoUrl => string.IsNullOrEmpty(RepoOwner) || string.IsNullOrEmpty(RepoName) ? null : $"https://github.com/{RepoOwner}/{RepoName}";
+    [JsonIgnore] public string DownloadsText => string.Format(LocalizationService.Instance["DownloadsFormat"], Downloads);
+    [JsonIgnore] public string UpdatedText => LastUpdated is DateTime updated ? Ago(updated) : "";
+    // State column: exactly one of these (or IsInstalling) is shown
+    [JsonIgnore] public bool ShowInstalledState => IsInstalled && !HasUpdate && !IsInstalling;
+    [JsonIgnore] public bool ShowUpdateState => HasUpdate && !IsInstalling;
+    [JsonIgnore] public bool ShowNoState => !IsInstalled && !IsInstalling;
+    [JsonIgnore] public string InstallButtonText => IsInstalled ? LocalizationService.Instance["Reinstall"] : LocalizationService.Instance["Install"];
+
+        
     public OnlineModInfo()
     {
         LocalizationService.Instance.LanguageChanged += (_, _) =>
@@ -26,41 +70,12 @@ public partial class OnlineModInfo : ModInfo
         };
     }
 
-    //Base properties in ModInfo class
 
-    [JsonPropertyName("downloadUrl")]
-    public string DownloadUrl { get; set; } = "";
+    partial void OnIsInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(InstallButtonText));
+    }
 
-    [JsonIgnore] // lazy fix hehe
-    public string ThumbnailUrl { get; set; } = "";
-
-    [ObservableProperty]
-    public partial Bitmap? ThumbnailImage { get; set; }
-
-    [JsonIgnore]
-    public List<string> ImageUrls { get; set; } = [];
-
-    [JsonIgnore]
-    public ObservableCollection<Bitmap> GalleryImages { get; } = []; 
-
-    [JsonIgnore]
-    public bool GalleryLoaded { get; set; }
-
-    // UI only
-    public string RepoName { get; set; } = "";
-
-    public string RepoOwner { get; set; } = "";
-
-    [JsonIgnore]
-    public string? RepoUrl => string.IsNullOrEmpty(RepoOwner) || string.IsNullOrEmpty(RepoName)
-        ? null : $"https://github.com/{RepoOwner}/{RepoName}";
-
-    // I just put AI tags in here so they can't be used as regular tags
-    private static readonly HashSet<string> ReservedTags = new(StringComparer.OrdinalIgnoreCase)
-        { "ai-free", "ai-assisted", "vibecoded", "active", "inactive" };
-
-    [JsonIgnore]
-    public List<ModTag> _Tags { get; private set; } = []; // TODO: please rename sensibly
 
     public void RebuildTags()
     {
@@ -70,9 +85,17 @@ public partial class OnlineModInfo : ModInfo
         // AI badge
         switch ((Ai ?? "").Trim().ToLowerInvariant())
         {
-            case "ai-free": list.Add(new ModTag(loc["AiFree"])); break;
-            case "ai-assisted": list.Add(new ModTag(loc["AiAssisted"], IsAssisted: true)); break;
-            case "vibecoded": list.Add(new ModTag(loc["AiVibecoded"], IsVibecoded: true)); break;
+            case "ai-free": 
+                list.Add(new ModTag(loc["AiFree"])); 
+                break;
+
+            case "ai-assisted": 
+                list.Add(new ModTag(loc["AiAssisted"], IsAssisted: true)); 
+                break;
+
+            case "vibecoded": 
+                list.Add(new ModTag(loc["AiVibecoded"], IsVibecoded: true)); 
+                break;
         }
 
         switch ((Development ?? "").Trim().ToLowerInvariant())
@@ -80,6 +103,7 @@ public partial class OnlineModInfo : ModInfo
             case "active":
                 list.Add(new ModTag(LocalizationService.Instance["DevelopmentActive"], IsActive: true));
                 break;
+
             case "inactive":
                 list.Add(new ModTag(LocalizationService.Instance["DevelopmentInactive"], IsInactive: true));
                 break;
@@ -96,30 +120,11 @@ public partial class OnlineModInfo : ModInfo
         OnPropertyChanged(nameof(_Tags));
     }
 
-    [JsonIgnore]
-    public ObservableCollection<ChangelogEntry> Changelog { get; } = [];
-
-    [JsonIgnore]
-    public Task? ChangelogTask { get; set; }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DownloadsText))]
-    public partial long Downloads { get; set; }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UpdatedText))]
-    public partial DateTime? LastUpdated { get; set; }
-
-    [JsonIgnore]
-    public string DownloadsText => string.Format(LocalizationService.Instance["DownloadsFormat"], Downloads);
-
-    [JsonIgnore]
-    public string UpdatedText => LastUpdated is DateTime updated ? Ago(updated) : "";
-
     private static string Ago(DateTime updated)
     {
         var loc = LocalizationService.Instance;
         int days = (int)(DateTime.UtcNow - updated.ToUniversalTime()).TotalDays;
+
         return days switch
         {
             < 1 => loc["AgoToday"],
@@ -127,39 +132,5 @@ public partial class OnlineModInfo : ModInfo
             < 30 => string.Format(loc["AgoDays"], days),
             _ => updated.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentUICulture)
         };
-    }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState), nameof(ShowNoState))]
-    public partial bool IsInstalling { get; set; }
-
-    [ObservableProperty]
-    public partial double DownloadProgress { get; set; }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState), nameof(ShowNoState))]
-    public partial bool IsInstalled { get; set; }
-
-    // Set when the installed copy is older than this version
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInstalledState), nameof(ShowUpdateState))]
-    public partial bool HasUpdate { get; set; }
-
-    // State column: exactly one of these (or IsInstalling) is shown
-    [JsonIgnore]
-    public bool ShowInstalledState => IsInstalled && !HasUpdate && !IsInstalling;
-
-    [JsonIgnore]
-    public bool ShowUpdateState => HasUpdate && !IsInstalling;
-
-    [JsonIgnore]
-    public bool ShowNoState => !IsInstalled && !IsInstalling;
-
-    [JsonIgnore]
-    public string InstallButtonText => IsInstalled ? LocalizationService.Instance["Reinstall"] : LocalizationService.Instance["Install"];
-
-    partial void OnIsInstalledChanged(bool value)
-    {
-        OnPropertyChanged(nameof(InstallButtonText));
     }
 }

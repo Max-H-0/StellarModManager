@@ -10,12 +10,13 @@ using System.Text.Json;
 
 namespace StellarModManager.Services;
 
-public class ThemeService
+public static class ThemeService
 {
-    private readonly string _themesFolder = Path.Combine(AppContext.BaseDirectory, "Data", "Themes");
-    private Dictionary<string, ThemeDefinition>? _themeCache;
+    private static readonly string ThemesFolder = Path.Combine(AppContext.BaseDirectory, "Data", "Themes");
+    private static Dictionary<string, ThemeDefinition>? s_themeCache;
 
-    public void ApplyTheme(ThemeDefinition theme)
+
+    public static void ApplyTheme(ThemeDefinition theme)
     {
         var resources = Application.Current!.Resources;
 
@@ -27,9 +28,13 @@ public class ThemeService
             var resourceKey = $"Theme.{key}Brush";
 
             if (resources.TryGetValue(resourceKey, out var existing) && existing is SolidColorBrush brush)
+            {
                 brush.Color = color;
+            }
             else
+            {
                 resources[resourceKey] = new SolidColorBrush(color);
+            }
         }
 
         SetBrush("Background", theme.Background);
@@ -62,39 +67,34 @@ public class ThemeService
         }
     }
 
-    private Dictionary<string, ThemeDefinition> LoadAllThemes()
+    public static string[] GetAvailableThemeNames() => LoadAllThemes().Keys.ToArray();
+
+    public static ThemeDefinition LoadTheme(string themeName)
     {
-        if (_themeCache != null)
-            return _themeCache;
+        var themes = LoadAllThemes();
+        return themes.TryGetValue(themeName, out var theme) ? theme : new ThemeDefinition();
+    }
 
-        _themeCache = new(StringComparer.OrdinalIgnoreCase);
 
-        if (!Directory.Exists(_themesFolder))
-            return _themeCache;
+    private static Dictionary<string, ThemeDefinition> LoadAllThemes()
+    {
+        if (s_themeCache != null) return s_themeCache;
+        s_themeCache = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var path in Directory.GetFiles(_themesFolder, "*.json"))
+        if (!Directory.Exists(ThemesFolder)) return s_themeCache;
+
+        foreach (var path in Directory.GetFiles(ThemesFolder, "*.json"))
         {
             try
             {
                 string json = File.ReadAllText(path);
                 var theme = JsonSerializer.Deserialize<ThemeDefinition>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                if (theme != null && !string.IsNullOrWhiteSpace(theme.Name)) _themeCache[theme.Name] = theme;
+                if (theme != null && !string.IsNullOrWhiteSpace(theme.Name)) s_themeCache[theme.Name] = theme;
             }
-            catch
-            {
-                // Skip bad file
-            }
+            catch {} // Skip bad file 
         }
 
-        return _themeCache;
-    }
-
-    public string[] GetAvailableThemeNames() => LoadAllThemes().Keys.ToArray();
-
-    public ThemeDefinition LoadTheme(string themeName)
-    {
-        var themes = LoadAllThemes();
-        return themes.TryGetValue(themeName, out var theme) ? theme : new ThemeDefinition();
+        return s_themeCache;
     }
 }

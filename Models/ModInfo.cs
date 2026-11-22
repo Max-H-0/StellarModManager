@@ -19,15 +19,14 @@ public class ModInfo : ObservableObject
     public string Version
     {
         get;
-        set
-        {
-            if (SetProperty(ref field, value))
-                OnPropertyChanged(nameof(DisplayVersion));
+        set 
+        { 
+            if (SetProperty(ref field, value)) 
+            {
+                OnPropertyChanged(nameof(DisplayVersion)); 
+            }
         }
     } = "";
-
-    [JsonIgnore]
-    public string DisplayVersion => string.IsNullOrWhiteSpace(Version) ? "Unknown" : Version;
 
     [JsonPropertyName("description")]
     public string Description { get; set; } = "";
@@ -40,7 +39,7 @@ public class ModInfo : ObservableObject
 
     // ids of other mods this one needs
     [JsonPropertyName("needs")]
-    public List<string> Needs { get; set; } = [];
+    public List<string> Dependencies { get; set; } = [];
 
     // "ai-free", "ai-assisted", or "vibecoded"
     [JsonPropertyName("ai")]
@@ -53,4 +52,7 @@ public class ModInfo : ObservableObject
     // TODO!!!
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = [];
+    
+    [JsonIgnore]
+    public string DisplayVersion => string.IsNullOrWhiteSpace(Version) ? "Unknown" : Version;
 }

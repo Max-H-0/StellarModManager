@@ -15,21 +15,11 @@ public partial class MainWindowViewModel
 {
     public IReadOnlyList<GameInstallationInfo> DetectedGameInstalls { get; } = GameLocatorService.Locate();
 
-    [ObservableProperty]
-    public partial bool SetupRequired { get; set; } = true;
+    [ObservableProperty] public partial bool SetupRequired { get; set; } = true;
+    [ObservableProperty] public partial bool IsMelonLoaderValid { get; set; }
+    [ObservableProperty] public partial bool IsInstallingMelonLoader { get; set; }
+    [ObservableProperty] public partial string InstallProgressText { get; set; } = "";
 
-    [ObservableProperty]
-    public partial bool IsMelonLoaderValid { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsInstallingMelonLoader { get; set; }
-
-    [ObservableProperty]
-    public partial string InstallProgressText { get; set; } = "";
-
-    private readonly MelonLoaderInstaller _melonLoaderInstaller = new();
-
-    partial void OnGamePathChanged(string value) => InstallMelonLoaderCommand.NotifyCanExecuteChanged();
 
     partial void OnIsMelonLoaderValidChanged(bool value)
     {
@@ -38,22 +28,9 @@ public partial class MainWindowViewModel
         ApplyAutoCheckTimerState();
     }
 
+    partial void OnGamePathChanged(string value) => InstallMelonLoaderCommand.NotifyCanExecuteChanged();
     partial void OnIsInstallingMelonLoaderChanged(bool value) => InstallMelonLoaderCommand.NotifyCanExecuteChanged();
 
-    private bool CheckMelonLoader(string path)
-    {
-        var detector = new MelonLoaderDetector();
-        var result = detector.CheckInstallation(path);
-
-        MelonLoaderStatusText = result switch
-        {
-            MelonLoaderStatus.Installed => "MelonLoader is installed",
-            MelonLoaderStatus.NotInstalled => "MelonLoader is not installed",
-            _ => "Could not read that folder"
-        };
-
-        return result == MelonLoaderStatus.Installed;
-    }
 
     [RelayCommand]
     private void SelectSuggestedFolder(GameInstallationInfo info) => UseGameFolder(info.Directory.FullName);
@@ -67,67 +44,33 @@ public partial class MainWindowViewModel
             window = desktop.MainWindow;
         }
 
-        if (window == null || IsModOperationInProgress)
-            return;
+        if (window == null || IsModOperationInProgress) return;
+        if (!TryBeginModOperation(requireProfile: false)) return;
 
-        if (!TryBeginModOperation(requireProfile: false))
-            return;
         try
         {
-            var folders = await window.StorageProvider.OpenFolderPickerAsync(
-                new FolderPickerOpenOptions
+            var folders = await window.StorageProvider.OpenFolderPickerAsync
+            (
+                options: new FolderPickerOpenOptions
                 {
                     Title = "Select Unity Game Folder",
                     AllowMultiple = false
-                });
+                }
+            );
 
-            if (folders.Count > 0)
-                SetGameFolder(folders[0].Path.LocalPath);
+            if (folders.Count > 0) SetGameFolder(folders[0].Path.LocalPath);
         }
         finally
         {
             IsModOperationInProgress = false;
         }
     }
-
-    private void UseGameFolder(string path)
-    {
-        if (!TryBeginModOperation(requireProfile: false))
-            return;
-        try
-        {
-            SetGameFolder(path);
-        }
-        finally
-        {
-            IsModOperationInProgress = false;
-        }
-    }
-
-    private void SetGameFolder(string path)
-    {
-        GamePath = path;
-        IsMelonLoaderValid = CheckMelonLoader(path);
-        if (IsMelonLoaderValid)
-        {
-            OpenGameProfiles(path, _settingsService.LoadGameProfile()?.GamePath);
-            _settingsService.SaveGameProfile(new GameProfile { GamePath = path });
-            SearchGameProcessIfNull();
-        }
-        else
-        {
-            ClearGameProfiles();
-            SetupRequired = true;
-        }
-    }
-
-    private bool CanInstallMelonLoader() => GamePath != "No game selected" && !IsMelonLoaderValid && !IsInstallingMelonLoader;
 
     [RelayCommand(CanExecute = nameof(CanInstallMelonLoader))]
     private async Task InstallMelonLoader()
     {
-        if (!TryBeginModOperation(requireProfile: false))
-            return;
+        if (!TryBeginModOperation(requireProfile: false)) return;
+
         IsInstallingMelonLoader = true;
         InstallProgressText = "Starting...";
 
@@ -135,14 +78,14 @@ public partial class MainWindowViewModel
         {
             var progress = new Progress<string>(text => InstallProgressText = text);
 
-            await _melonLoaderInstaller.InstallAsync(GamePath, progress);
+            await MelonLoaderInstaller.InstallAsync(GamePath, progress);
 
             IsMelonLoaderValid = CheckMelonLoader(GamePath);
 
             if (IsMelonLoaderValid)
             {
-                OpenGameProfiles(GamePath, _settingsService.LoadGameProfile()?.GamePath);
-                _settingsService.SaveGameProfile(new GameProfile { GamePath = GamePath });
+                OpenGameProfiles(GamePath, SettingsService.LoadGameProfile()?.GamePath);
+                SettingsService.SaveGameProfile(new GameProfile { GamePath = GamePath });
             }
         }
         catch (Exception ex)
@@ -163,5 +106,57 @@ public partial class MainWindowViewModel
             return;
         SetupRequired = false;
         _ = RefreshMods();
+    }
+
+
+    private bool CheckMelonLoader(string path)
+    {
+        var result = MelonLoaderDetector.CheckInstallation(path);
+
+        MelonLoaderStatusText = result switch
+        {
+            MelonLoaderStatus.Installed => "MelonLoader is installed",
+            MelonLoaderStatus.NotInstalled => "MelonLoader is not installed",
+            _ => "Could not read that folder"
+        };
+
+        return result == MelonLoaderStatus.Installed;
+    }
+
+    private void UseGameFolder(string path)
+    {
+        if (!TryBeginModOperation(requireProfile: false)) return;
+
+        try
+        {
+            SetGameFolder(path);
+        }
+        finally
+        {
+            IsModOperationInProgress = false;
+        }
+    }
+
+    private void SetGameFolder(string path)
+    {
+        GamePath = path;
+        IsMelonLoaderValid = CheckMelonLoader(path);
+
+        if (IsMelonLoaderValid)
+        {
+            OpenGameProfiles(path, SettingsService.LoadGameProfile()?.GamePath);
+            SettingsService.SaveGameProfile(new GameProfile { GamePath = path });
+            SearchGameProcessIfNull();
+        }
+        else
+        {
+            ClearGameProfiles();
+            SetupRequired = true;
+        }
+    }
+
+    private bool CanInstallMelonLoader() 
+    {
+        return GamePath != "No game selected" && !IsMelonLoaderValid && !IsInstallingMelonLoader;
     }
 }

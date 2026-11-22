@@ -9,17 +9,17 @@ using StellarModManager.Models;
 
 namespace StellarModManager.Services;
 
-public class AppUpdatingService
+public static class AppUpdatingService
 {
     private const string RepoApi = "https://api.github.com/repos/jollyname/StellarModManager/releases/latest";
 
-    public async Task<UpdateInfo?> CheckAsync()
+
+    public static async Task<UpdateInfo?> CheckAsync()
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("StellarModManager");
 
-        var release = await client.GetFromJsonAsync<GitHubRelease>(RepoApi);
-        if (release is null) return null;
+        if (await client.GetFromJsonAsync<GitHubRelease>(requestUri: RepoApi) is not GitHubRelease release) return null;
 
         var latest = Version.Parse(release.tag_name.TrimStart('v'));
         var current = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -29,7 +29,7 @@ public class AppUpdatingService
         return new UpdateInfo(latest, release.assets, release.body, release.html_url);
     }
 
-    public async Task DownloadAndInstallUpdateAsync(UpdateInfo update, IProgress<double> progress)
+    public static async Task DownloadAndInstallUpdateAsync(UpdateInfo update, IProgress<double> progress)
     {
         GitHubAsset? installerAsset = null;
 

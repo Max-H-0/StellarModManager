@@ -2,26 +2,17 @@
 
 namespace StellarModManager.Services;
 
-public enum MelonLoaderStatus
-{
-    Installed,
-    NotInstalled
-}
+public enum MelonLoaderStatus { Installed, NotInstalled }
 
-public class MelonLoaderDetector
+public static class MelonLoaderDetector
 {
     // Idk if this is a good way to check if MelonLoader is installed, but Idc.
-    public MelonLoaderStatus CheckInstallation(string gamePath)
+    public static MelonLoaderStatus CheckInstallation(string gamePath)
     {
-        bool melonLoaderFolder = Directory.Exists(Path.Combine(gamePath, "MelonLoader"));
+        bool folderExists = Directory.Exists(Path.Combine(gamePath, "MelonLoader"));
+        bool dllExists = File.Exists(Path.Combine(gamePath, "version.dll"));
+        bool isInstalled = folderExists && dllExists;
 
-        bool loaderDll = File.Exists(Path.Combine(gamePath, "version.dll"));
-
-        if (melonLoaderFolder && loaderDll)
-        {
-            return MelonLoaderStatus.Installed;
-        }
-
-        return MelonLoaderStatus.NotInstalled;
+        return isInstalled ? MelonLoaderStatus.Installed : MelonLoaderStatus.NotInstalled;
     }
 }

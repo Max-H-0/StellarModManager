@@ -17,35 +17,38 @@ namespace StellarModManager.Services;
 
 public partial class ModRepositoryService
 {
-    private readonly HttpClient _httpClient = new();
-    private readonly SemaphoreSlim _commitSlots = new(4);
-
-    public ModRepositoryService()
+    private class RepositoryResponse
     {
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("StellarModManager");
+        [JsonPropertyName("mods")] public List<ModRegistryEntry> Mods { get; set; } = [];
     }
 
+
     private static readonly string[] DefaultThumbnailAssets =
-    {
+    [
         "avares://StellarModManager/Assets/Thumbnails/smileyAngry.png",
         "avares://StellarModManager/Assets/Thumbnails/smileyCry.png",
         "avares://StellarModManager/Assets/Thumbnails/smileyFrown.png",
         "avares://StellarModManager/Assets/Thumbnails/smileyGrumpy.png",
         "avares://StellarModManager/Assets/Thumbnails/smileyTounge.png",
         "avares://StellarModManager/Assets/Thumbnails/smileyWhat.png"
-    };
+    ];
 
-    private static Bitmap LoadDefaultThumbnail(OnlineModInfo mod)
+    private readonly HttpClient _httpClient = new();
+    private readonly SemaphoreSlim _commitSlots = new(4);
+
+
+    public ModRepositoryService()
     {
-        int index = Random.Shared.Next(DefaultThumbnailAssets.Length);
-
-        using var stream = AssetLoader.Open(new Uri(DefaultThumbnailAssets[index]));
-
-        return Bitmap.DecodeToWidth(stream, 192);
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("StellarModManager");
     }
 
-    // The catalogue host sends Cache-Control: no-cache. raw.githubusercontent.com ignores a query string.
-    private static string NoCache(string url) => $"{url}?t={DateTime.UtcNow.Ticks}";
+
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
+    private static partial Regex GitHubName();
+    
+    [GeneratedRegex(@"^([A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?$")]
+    private static partial Regex RepoPath();
+
 
     public async Task<ModListResult> GetModsAsync(string url)
     {
@@ -54,20 +57,109 @@ public partial class ModRepositoryService
         RepositoryResponse? response = JsonSerializer.Deserialize<RepositoryResponse>(json);
         var result = new ModListResult();
 
-        if (response == null)
-            return result;
+        if (response == null) return result;
 
         //load every mod at once, to speed up request
         OnlineModInfo?[] mods = await Task.WhenAll(response.Mods.Select(entry => LoadModAsync(entry, result)));
         result.Mods.AddRange(mods.OfType<OnlineModInfo>());
+
         return result;
     }
 
-    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
-    private static partial Regex GitHubName();
+    // reuse request instead of always starting a new one
+    public Task LoadChangelogAsync(OnlineModInfo mod)
+    {
+        return mod.ChangelogTask ??= FetchChangelogAsync(mod);
+    }
     
-    [GeneratedRegex(@"^([A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?$")]
-    private static partial Regex RepoPath();
+    public async Task DownloadModAsync(string url, string destination, IProgress<double>? progress = null)
+    {
+        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        long? totalBytes = response.Content.Headers.ContentLength;
+
+        await using var contentStream = await response.Content.ReadAsStreamAsync();
+        await using var fileStream = File.Create(destination);
+
+        var buffer = new byte[81920];
+        long totalRead = 0;
+        int bytesRead;
+
+        while ((bytesRead = await contentStream.ReadAsync(buffer)) > 0)
+        {
+            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+            totalRead += bytesRead;
+
+            if (totalBytes.HasValue && totalBytes.Value > 0)
+            {
+                progress?.Report((double)totalRead / totalBytes.Value * 100);
+            }
+        }
+    }
+
+    public async Task LoadThumbnailAsync(OnlineModInfo mod)
+    {
+        if (mod.ThumbnailImage != null) return;
+
+        if (string.IsNullOrWhiteSpace(mod.ThumbnailUrl))
+        {
+            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
+            return;
+        }
+
+        try
+        {
+            byte[] bytes = await _httpClient.GetByteArrayAsync(mod.ThumbnailUrl);
+
+            using var contentStream = new MemoryStream(bytes);
+            mod.ThumbnailImage = Bitmap.DecodeToWidth(contentStream, 192);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Thumbnail loading failed for {mod.Name}: {ex.Message}");
+
+            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
+        }
+    }
+
+    public async Task LoadGalleryAsync(OnlineModInfo mod)
+    {
+        var urls = new[] { mod.ThumbnailUrl }
+            .Concat(mod.ImageUrls)
+            .Where(url => !string.IsNullOrEmpty(url))
+            .Distinct()
+            .ToList();
+
+        if (mod.GalleryLoaded || urls.Count == 0) return;
+        mod.GalleryLoaded = true;
+
+        foreach (string url in urls)
+        {
+            try
+            {
+                byte[] bytes = await _httpClient.GetByteArrayAsync(url);
+                using var contentStream = new MemoryStream(bytes);
+                mod.GalleryImages.Add(Bitmap.DecodeToWidth(contentStream, 1280));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Gallery image failed for {mod.Name}: {ex.Message}");
+            }
+        }
+    }
+
+
+    private static Bitmap LoadDefaultThumbnail(OnlineModInfo mod)
+    {
+        int index = Random.Shared.Next(DefaultThumbnailAssets.Length);
+        using var stream = AssetLoader.Open(new Uri(DefaultThumbnailAssets[index]));
+
+        return Bitmap.DecodeToWidth(stream, 192);
+    }
+
+    // The catalogue host sends Cache-Control: no-cache. raw.githubusercontent.com ignores a query string.
+    private static string NoCache(string url) => $"{url}?t={DateTime.UtcNow.Ticks}";
 
     private static bool IsSafe(ModRegistryEntry entry)
     {
@@ -132,6 +224,7 @@ public partial class ModRepositoryService
     private async Task<string> LatestCommitAsync(string owner, string repo)
     {
         await _commitSlots.WaitAsync();
+
         try
         {
             string atom = await _httpClient.GetStringAsync($"https://github.com/{owner}/{repo}/commits/main.atom");
@@ -145,29 +238,24 @@ public partial class ModRepositoryService
         }
     }
 
-    // reuse request instead of always starting a new one
-    public Task LoadChangelogAsync(OnlineModInfo mod)
-    {
-        if (mod.ChangelogTask == null)
-            mod.ChangelogTask = FetchChangelogAsync(mod);
-
-        return mod.ChangelogTask;
-    }
-
     private async Task FetchChangelogAsync(OnlineModInfo mod)
     {
         try
         {
-            var releases = await _httpClient.GetFromJsonAsync<List<GitHubRelease>>(
-                $"https://api.github.com/repos/{mod.RepoOwner}/{mod.RepoName}/releases?per_page=30") ?? new();
+            var releases = await _httpClient.GetFromJsonAsync<List<GitHubRelease>>
+            (
+                requestUri: $"https://api.github.com/repos/{mod.RepoOwner}/{mod.RepoName}/releases?per_page=30"
+            ) ?? [];
 
-            mod.Downloads = releases.Sum(release => release.assets?.Sum(asset => asset.download_count) ?? 0);
+            mod.Downloads = releases.Sum(release => release.assets?.Sum(long (asset) => asset.download_count) ?? 0);
             mod.LastUpdated = releases.Max(release => release.published_at);
 
             foreach (var release in releases)
             {
                 if (Version.TryParse(release.tag_name.TrimStart('v'), out var version))
+                {
                     mod.Changelog.Add(new ChangelogEntry(version, release.body ?? ""));
+                }
             }
         }
         catch (Exception ex)
@@ -176,92 +264,5 @@ public partial class ModRepositoryService
             mod.ChangelogTask = null;
             Console.WriteLine($"Changelog failed for {mod.Name}: {ex.Message}");
         }
-    }
-
-    public async Task DownloadModAsync(string url, string destination, IProgress<double>? progress = null)
-    {
-        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        long? totalBytes = response.Content.Headers.ContentLength;
-
-        await using var contentStream = await response.Content.ReadAsStreamAsync();
-        await using var fileStream = File.Create(destination);
-
-        var buffer = new byte[81920];
-        long totalRead = 0;
-        int bytesRead;
-
-        while ((bytesRead = await contentStream.ReadAsync(buffer)) > 0)
-        {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
-            totalRead += bytesRead;
-
-            if (totalBytes.HasValue && totalBytes.Value > 0)
-            {
-                progress?.Report((double)totalRead / totalBytes.Value * 100);
-            }
-        }
-    }
-
-    public async Task LoadThumbnailAsync(OnlineModInfo mod)
-    {
-        if (mod.ThumbnailImage != null)
-            return;
-
-        if (string.IsNullOrWhiteSpace(mod.ThumbnailUrl))
-        {
-            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
-            return;
-        }
-
-        try
-        {
-            byte[] bytes = await _httpClient.GetByteArrayAsync(mod.ThumbnailUrl);
-
-            using var contentStream = new MemoryStream(bytes);
-            mod.ThumbnailImage = Bitmap.DecodeToWidth(contentStream, 192);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(
-                $"Thumbnail loading failed for {mod.Name}: {ex.Message}");
-
-            mod.ThumbnailImage = LoadDefaultThumbnail(mod);
-        }
-    }
-
-    public async Task LoadGalleryAsync(OnlineModInfo mod)
-    {
-        var urls = new[] { mod.ThumbnailUrl }
-        .Concat(mod.ImageUrls)
-        .Where(url => !string.IsNullOrEmpty(url))
-        .Distinct()
-        .ToList();
-
-
-        if (mod.GalleryLoaded || urls.Count == 0)
-            return;
-        mod.GalleryLoaded = true;
-
-        foreach (string url in urls)
-        {
-            try
-            {
-                byte[] bytes = await _httpClient.GetByteArrayAsync(url);
-                using var contentStream = new MemoryStream(bytes);
-                mod.GalleryImages.Add(Bitmap.DecodeToWidth(contentStream, 1280));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Gallery image failed for {mod.Name}: {ex.Message}");
-            }
-        }
-    }
-
-    private class RepositoryResponse
-    {
-        [JsonPropertyName("mods")]
-        public List<ModRegistryEntry> Mods { get; set; } = [];
     }
 }

@@ -3,13 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace StellarModManager.ViewModels;
 
-public enum AppPage
-{
-    Browse,
-    Library,
-    Updates,
-    Settings
-}
+public enum AppPage { Browse, Library, Updates, Settings }
 
 public partial class MainWindowViewModel
 {
@@ -25,16 +19,21 @@ public partial class MainWindowViewModel
     public bool IsUpdatesPage => CurrentPage == AppPage.Updates;
     public bool IsSettingsPage => CurrentPage == AppPage.Settings;
 
+
     [RelayCommand]
     private void Navigate(AppPage page)
     {
-        if (page == AppPage.Library)
-            RefreshLibrary();
+        if (page == AppPage.Library) RefreshLibrary();
+
         CurrentPage = page;
     }
 
     [RelayCommand]
-    private void TogglePane() => IsPaneOpen = !IsPaneOpen;
+    private void TogglePane()
+    {
+        IsPaneOpen = !IsPaneOpen;
+    }
+
 
     partial void OnCurrentPageChanged(AppPage value)
     {

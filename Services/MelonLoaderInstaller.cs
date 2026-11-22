@@ -7,18 +7,14 @@ using System.Threading.Tasks;
 
 namespace StellarModManager.Services;
 
-public enum GameArchitecture
-{
-    Unknown,
-    X86,
-    X64
-}
+public enum GameArchitecture { Unknown, X86, X64 }
 
-public class MelonLoaderInstaller
+public static class MelonLoaderInstaller
 {
     private const string LatestReleaseUrl = "https://api.github.com/repos/LavaGang/MelonLoader/releases/latest";
 
-    public async Task InstallAsync(string gamePath, IProgress<string>? progress = null)
+
+    public static async Task InstallAsync(string gamePath, IProgress<string>? progress = null)
     {
         progress?.Report("Locating game executable...");
 
@@ -29,15 +25,12 @@ public class MelonLoaderInstaller
         {
             throw new InvalidOperationException("Could not determine whether the game is 32-bit or 64-bit.");
         }
-
         progress?.Report($"Detected {(architecture == GameArchitecture.X64 ? "64-bit" : "32-bit")} game. " + "Fetching latest MelonLoader release...");
 
         string assetName = architecture == GameArchitecture.X64 ? "MelonLoader.x64.zip" : "MelonLoader.x86.zip";
-
         string downloadUrl = await GetLatestReleaseAssetUrlAsync(assetName);
 
         string tempZip = Path.Combine(Path.GetTempPath(), $"MelonLoader_{Guid.NewGuid():N}.zip");
-
         try
         {
             progress?.Report("Downloading MelonLoader...");
@@ -57,10 +50,10 @@ public class MelonLoaderInstaller
         }
     }
 
+
     private static string? FindGameExecutable(string gamePath)
     {
-        if (!Directory.Exists(gamePath))
-            return null;
+        if (!Directory.Exists(gamePath)) return null;
 
         // Check for the "<ProductName>_Data" folder to find the game executable.
         foreach (var exe in Directory.GetFiles(gamePath, "*.exe"))
@@ -97,17 +90,18 @@ public class MelonLoaderInstaller
                 _ => GameArchitecture.Unknown
             };
         }
-        catch { return GameArchitecture.Unknown; }
+        catch 
+        { 
+            return GameArchitecture.Unknown; 
+        }
     }
 
     private static async Task<string> GetLatestReleaseAssetUrlAsync(string assetName)
     {
         using var client = new HttpClient();
-
         client.DefaultRequestHeaders.UserAgent.ParseAdd("StellarModManager");
 
         string json = await client.GetStringAsync(LatestReleaseUrl);
-
         using var doc = JsonDocument.Parse(json);
         var assets = doc.RootElement.GetProperty("assets");
 

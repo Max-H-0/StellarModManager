@@ -15,41 +15,55 @@ public partial class MainWindowViewModel
         new FuncValueConverter<string, string>(code =>
             code is null ? "" : LocalizationService.Instance.GetLanguageDisplayName(code));
 
-    private readonly ThemeService _themeService = new();
+    private readonly DispatcherTimer _updateCheckTimer;
+
 
     public string AppVersion { get; } = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 
     public ObservableCollection<string> AvailableThemes { get; } = [];
     public ObservableCollection<string> AvailableLanguages { get; } = [];
 
-    [ObservableProperty]
-    public partial string SelectedTheme { get; set; } = "Purple";
+    [ObservableProperty] public partial string SelectedTheme { get; set; } = "Purple";
+    [ObservableProperty] public partial string SelectedLanguage { get; set; } = "en";
+    [ObservableProperty] public partial bool ConfirmBeforeRemove { get; set; } = true;
+    [ObservableProperty] public partial bool AutoDeployDependencies { get; set; }
+    [ObservableProperty] public partial bool AutoCheckForAppUpdates { get; set; } = true;
+    [ObservableProperty] public partial bool AutoCheckForModUpdates { get; set; } = true;
+    [ObservableProperty] public partial bool IsCompactView { get; set; } // Mod lists show a three-column card grid instead of the table
 
-    [ObservableProperty]
-    public partial string SelectedLanguage { get; set; } = "en";
 
-    [ObservableProperty]
-    public partial bool ConfirmBeforeRemove { get; set; } = true;
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        LocalizationService.Instance.SetLanguage(value);
+        PersistSettings();
+    }
 
-    [ObservableProperty]
-    public partial bool AutoDeployDependencies { get; set; }
+    partial void OnSelectedThemeChanged(string value)
+    {
+        ThemeService.ApplyTheme(ThemeService.LoadTheme(value));
+        PersistSettings();
+    }
 
-    [ObservableProperty]
-    public partial bool AutoCheckForAppUpdates { get; set; } = true;
+    partial void OnAutoCheckForModUpdatesChanged(bool value)
+    {
+        PersistSettings();
+        ApplyAutoCheckTimerState();
+    }
 
-    [ObservableProperty]
-    public partial bool AutoCheckForModUpdates { get; set; } = true;
+    partial void OnAutoCheckForAppUpdatesChanged(bool value) => PersistSettings();
+    partial void OnConfirmBeforeRemoveChanged(bool value) => PersistSettings();
+    partial void OnAutoDeployDependenciesChanged(bool value) => PersistSettings();
+    partial void OnIsCompactViewChanged(bool value) => PersistSettings();
 
-    // Mod lists show a three-column card grid instead of the table
-    [ObservableProperty]
-    public partial bool IsCompactView { get; set; }
+    
+    [RelayCommand] private void ShowListView() => IsCompactView = false;
+    [RelayCommand] private void ShowCompactView() => IsCompactView = true;
 
-    private readonly DispatcherTimer _updateCheckTimer;
 
     // Settings are saved as soon as they change
     private void PersistSettings()
     {
-        _settingsService.SaveAppSettings(new AppSettings
+        SettingsService.SaveAppSettings(new AppSettings
         {
             Language = SelectedLanguage,
             Theme = SelectedTheme,
@@ -61,52 +75,25 @@ public partial class MainWindowViewModel
             CompactModList = IsCompactView
         });
     }
-
-    partial void OnSelectedLanguageChanged(string value)
-    {
-        LocalizationService.Instance.SetLanguage(value);
-        PersistSettings();
-    }
-
-    partial void OnSelectedThemeChanged(string value)
-    {
-        _themeService.ApplyTheme(_themeService.LoadTheme(value));
-        PersistSettings();
-    }
-
-    partial void OnAutoCheckForAppUpdatesChanged(bool value) => PersistSettings();
-
-    partial void OnConfirmBeforeRemoveChanged(bool value) => PersistSettings();
-
-    partial void OnAutoDeployDependenciesChanged(bool value) => PersistSettings();
-
-    partial void OnIsCompactViewChanged(bool value) => PersistSettings();
-
-    [RelayCommand]
-    private void ShowListView() => IsCompactView = false;
-
-    [RelayCommand]
-    private void ShowCompactView() => IsCompactView = true;
-
-    partial void OnAutoCheckForModUpdatesChanged(bool value)
-    {
-        PersistSettings();
-        ApplyAutoCheckTimerState();
-    }
+   
 
     private void ApplyAutoCheckTimerState()
     {
         if (AutoCheckForModUpdates && IsMelonLoaderValid)
+        {
             _updateCheckTimer.Start();
+        }
         else
+        {
             _updateCheckTimer.Stop();
+        }
     }
 
     private void LoadAvailableThemes()
     {
         AvailableThemes.Clear();
 
-        foreach (var name in _themeService.GetAvailableThemeNames())
+        foreach (var name in ThemeService.GetAvailableThemeNames())
         {
             AvailableThemes.Add(name);
         }

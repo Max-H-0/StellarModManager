@@ -14,13 +14,13 @@ public static partial class SteamInfoService
     private const string GamesDirectory = "steamapps/common/";
     private const string LibraryVdfPath = "steamapps/libraryfolders.vdf";
 
-
     [SupportedOSPlatform("windows")]
     public static readonly (RegistryKey root, string subKey, string valueName)[] RegistryPaths =
     OperatingSystem.IsWindows() ? [
         (Registry.CurrentUser, @"SOFTWARE\Valve\Steam", "SteamPath"),
         (Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath")
     ] : [];
+
 
     [GeneratedRegex("""(?:"path")(?:\s*)(?:")(?<path>.*)(?:")""")]
     private static partial Regex PathExtractionRegex();
@@ -72,7 +72,6 @@ public static partial class SteamInfoService
 
         return gamePaths;
     }
-
 
     public static string? GetAppId(DirectoryInfo directory)
     {

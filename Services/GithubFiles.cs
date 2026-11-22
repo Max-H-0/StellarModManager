@@ -9,10 +9,10 @@ public static partial class GithubFiles
     [GeneratedRegex(@"Grit::Commit/([0-9a-f]{40})", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex CommitInFeed();
 
+
     public static string? CommitFromAtom(string atom)
     {
-        if (string.IsNullOrEmpty(atom))
-            return null;
+        if (string.IsNullOrEmpty(atom)) return null;
 
         Match match = CommitInFeed().Match(atom);
         return match.Success ? match.Groups[1].Value : null;

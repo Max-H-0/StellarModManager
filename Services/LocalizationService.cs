@@ -10,8 +10,6 @@ public class LocalizationService : INotifyPropertyChanged
 {
     public static LocalizationService Instance { get; } = new();
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     private readonly Dictionary<string, string> _fallbackTranslations = [];
     private readonly Dictionary<string, string> _languageDisplayNames = [];
     private Dictionary<string, string> _currentTranslations = [];
@@ -19,7 +17,9 @@ public class LocalizationService : INotifyPropertyChanged
     private const string FallbackLanguage = "en";
     public string CurrentLanguage { get; private set; } = FallbackLanguage;
 
+    public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? LanguageChanged;
+
 
     private LocalizationService()
     {
@@ -27,19 +27,18 @@ public class LocalizationService : INotifyPropertyChanged
         _currentTranslations = _fallbackTranslations;
     }
 
+
     public string this[string key]
     {
         get
         {
-            if (_currentTranslations.TryGetValue(key, out var value))
-                return value;
-
-            if (_fallbackTranslations.TryGetValue(key, out var fallback))
-                return fallback;
+            if (_currentTranslations.TryGetValue(key, out var translation)) return translation;
+            if (_fallbackTranslations.TryGetValue(key, out var fallback)) return fallback;
 
             return key;
         }
     }
+
 
     public string Format(string key, params object[] args)
     {
@@ -49,10 +48,9 @@ public class LocalizationService : INotifyPropertyChanged
     public bool TrySetLanguage(string desiredLanguage, out string usedLanguage)
     {
         var previousLanguage = CurrentLanguage;
-
         var language = LoadLanguage(desiredLanguage);
+        
         bool languageExists = language.Count != 0;
-
         if (languageExists)
         {
             CurrentLanguage = usedLanguage = desiredLanguage;
@@ -65,7 +63,6 @@ public class LocalizationService : INotifyPropertyChanged
         }
 
         bool changed = previousLanguage != CurrentLanguage;
-
         if (changed)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
@@ -83,8 +80,7 @@ public class LocalizationService : INotifyPropertyChanged
     public IEnumerable<string> GetAvailableLanguages()
     {
         var folder = Path.Combine(AppContext.BaseDirectory, "Data/Localization");
-        if (!Directory.Exists(folder))
-            yield break;
+        if (!Directory.Exists(folder)) yield break;
 
         foreach (var file in Directory.GetFiles(folder, "*.json"))
         {
@@ -101,12 +97,12 @@ public class LocalizationService : INotifyPropertyChanged
         return _languageDisplayNames.TryGetValue(code, out var name) ? name : code;
     }
 
+
     private static Dictionary<string, string> LoadLanguage(string languageCode)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Data/Localization", $"{languageCode}.json");
 
-        if (!File.Exists(path))
-            return [];
+        if (!File.Exists(path)) return [];
 
         try
         {

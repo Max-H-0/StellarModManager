@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace StellarModManager.Services;
 
-public class ModInstallerService
+public static class ModInstallerService
 {
-    public async Task InstallAsync(string zipPath, string libraryPath)
+    public static async Task InstallAsync(string zipPath, string libraryPath)
     {
         if (!File.Exists(zipPath))
         {
